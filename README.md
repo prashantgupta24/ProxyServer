@@ -1,30 +1,54 @@
 Cache, Proxies, Queues
 =========================
 
-### Setup
+### Set/Get
 
-* Clone this repo, run `npm install`.
-* Install redis and run on localhost:6379
+		app.get('/get', function(req, res) {
+		  client.get("string key", function (err, reply) {
+			if(reply)
+			{
+				client.ttl('string key', function writeTTL(err, data) {
+					res.send(reply.toString()+" expires in "+ data);
+				})
+			}
+			else
+				res.send("Key Expired!")
+			});
+		})
+		
+		app.get('/set', function(req, res) {
+		
+		  client.set("string key", "This message will self-destruct in 10 seconds", redis.print);
+			client.expire("string key", 10);
+			client.ttl('string key', function writeTTL(err, data) {
+				res.send('Key inserted with TTL '+ data);
+			})
+		})
 
-### A simple web server
+### Recent sites
 
-Use [express](http://expressjs.com/) to install a simple web server.
-
-	var server = app.listen(3000, function () {
+	app.use(function(req, res, next)
+	{
+		//console.log(req.method, req.url);
 	
-	  var host = server.address().address
-	  var port = server.address().port
+		client.lpush("rec", req.url, function(err,value){
+			if(err)
+				console.log(err);
+		});
+		 client.ltrim("rec", 0, 4);
 	
-	  console.log('Example app listening at http://%s:%s', host, port)
-	})
-
-Express uses the concept of routes to use pattern matching against requests and sending them to specific functions.  You can simply write back a response body.
-
-	app.get('/', function(req, res) {
-	  res.send('hello world')
-	})
-
-### Redis
+		next(); // Passing the request to the next handler in the stack.
+	});
+	
+	
+	app.get('/recent', function(req, res) {
+		 client.lrange("rec",0,4,function(err,value){
+			 res.send(value)
+		 });
+	});
+	
+	
+### Upload/Meow
 
 You will be using [redis](http://redis.io/) to build some simple infrastructure components, using the [node-redis client](https://github.com/mranney/node_redis).
 
