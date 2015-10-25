@@ -25,6 +25,9 @@ Cache, Proxies, Queues
 			})
 		})
 
+
+![Image](https://github.com/prashantgupta24/ProxyServer/blob/master/Screencasts/get_set.gif)
+
 ### Recent sites
 
 	app.use(function(req, res, next)
@@ -45,6 +48,8 @@ Cache, Proxies, Queues
 		 });
 	});
 	
+
+![Image](https://github.com/prashantgupta24/ProxyServer/blob/master/Screencasts/recent.gif)
 	
 ### Upload/Meow
 
@@ -76,6 +81,9 @@ Cache, Proxies, Queues
 		});
 
  	});
+ 	
+
+![Image](https://github.com/prashantgupta24/ProxyServer/blob/master/Screencasts/upload_meow.gif)
  	
 ### Additional service instance running
 
@@ -111,4 +119,6 @@ Cache, Proxies, Queues
 			res.redirect(reply+req.url);
 		})
 	});
+
+![Image](https://github.com/prashantgupta24/ProxyServer/blob/master/Screencasts/proxy.gif)
 
