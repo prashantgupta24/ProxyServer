@@ -1,79 +1,114 @@
 Cache, Proxies, Queues
 =========================
 
-### Setup
+### Set/Get
 
-* Clone this repo, run `npm install`.
-* Install redis and run on localhost:6379
+		app.get('/get', function(req, res) {
+		  client.get("string key", function (err, reply) {
+			if(reply)
+			{
+				client.ttl('string key', function writeTTL(err, data) {
+					res.send(reply.toString()+" expires in "+ data);
+				})
+			}
+			else
+				res.send("Key Expired!")
+			});
+		})
+		
+		app.get('/set', function(req, res) {
+		
+		  client.set("string key", "This message will self-destruct in 10 seconds", redis.print);
+			client.expire("string key", 10);
+			client.ttl('string key', function writeTTL(err, data) {
+				res.send('Key inserted with TTL '+ data);
+			})
+		})
 
-### A simple web server
+### Recent sites
 
-Use [express](http://expressjs.com/) to install a simple web server.
-
-	var server = app.listen(3000, function () {
-	
-	  var host = server.address().address
-	  var port = server.address().port
-	
-	  console.log('Example app listening at http://%s:%s', host, port)
-	})
-
-Express uses the concept of routes to use pattern matching against requests and sending them to specific functions.  You can simply write back a response body.
-
-	app.get('/', function(req, res) {
-	  res.send('hello world')
-	})
-
-### Redis
-
-You will be using [redis](http://redis.io/) to build some simple infrastructure components, using the [node-redis client](https://github.com/mranney/node_redis).
-
-	var redis = require('redis')
-	var client = redis.createClient(6379, '127.0.0.1', {})
-
-In general, you can run all the redis commands in the following manner: client.CMD(args). For example:
-
-	client.set("key", "value");
-	client.get("key", function(err,value){ console.log(value)});
-
-### An expiring cache
-
-Create two routes, `/get` and `/set`.
-
-When `/set` is visited, set a new key, with the value:
-> "this message will self-destruct in 10 seconds".
-
-Use the expire command to make sure this key will expire in 10 seconds.
-
-When `/get` is visited, fetch that key, and send value back to the client: `res.send(value)` 
-
-
-### Recent visited sites
-
-Create a new route, `/recent`, which will display the most recently visited sites.
-
-There is already a global hook setup, which will allow you to see each site that is requested:
-
-	app.use(function(req, res, next) 
+	app.use(function(req, res, next)
 	{
-	...
+		client.lpush("rec", req.url, function(err,value){
+			if(err)
+				console.log(err);
+		});
+		 client.ltrim("rec", 0, 4);
+	
+		next(); // Passing the request to the next handler in the stack.
+	});
+	
+	
+	app.get('/recent', function(req, res) {
+		 client.lrange("rec",0,4,function(err,value){
+			 res.send(value)
+		 });
+	});
+	
+	
+### Upload/Meow
 
-Use the lpush, ltrim, and lrange redis commands to store the most recent 5 sites visited, and return that to the client.
+	 app.post('/upload',[ multer({ dest: './uploads/'}), function(req, res){
+	
+	   if( req.files.image )
+		 {
+ 		 fs.readFile( req.files.image.path, function (err, data) {
+ 	  		if (err) throw err;
+   			var img = new Buffer(data).toString('base64');
+			client.lpush("images", img)
+ 			});
+ 		}
+	
+		res.send("Uploaded!")
+	 }]);
 
-### Cat picture uploads: queue
+	app.get('/meow', function(req, res)
+ 	{
+		client.lpop("images", function(err, value){
+			if(value){
+				res.writeHead(200, {'content-type':'text/html'});
+				res.write("<img src='data:my_pic.jpg;base64,"+value+"'/>");
+	    		res.end();
+			}
+			else{
+				res.send("No more images!")
+			}
+		});
 
-Implement two routes, `/upload`, and `/meow`.
- 
-A stub for upload and meow has already been provided.
+ 	});
+ 	
+### Additional service instance running
 
-Use curl to help you upload easily.
+	 var server = app.listen(3000, function () {
+	
+	   var host = server.address().address
+	   var port = server.address().port
+	   console.log('Server1 listening at http://%s:%s', host, port)
+		 client.lpush("servers", "http://"+host+":"+port)
+	 })
+	
+	 var server1 = app.listen(3001, function () {
+	
+		 var host = server1.address().address
+		 var port = server1.address().port
+		 console.log('Server2 listening at http://%s:%s', host, port)
+		 client.lpush("servers", "http://"+host+":"+port)
+	 })
 
-	curl -F "image=@./img/morning.jpg" localhost:3000/upload
+### Demonstrate proxy
 
-Have `upload` store the images in a queue.  Have `meow` display the most recent image to the client and *remove* the image from the queue.
+	var proxyServer = proxy.listen(3002, function (){
+	
+		 var host = proxyServer.address().address
+		 var port = proxyServer.address().port
+		  console.log('Proxy server listening at http://%s:%s', host, port)
+	 })
+	 
+	 proxy.use(function(req, res, next){
+		client.rpoplpush("servers", "servers", function(err, reply){
+			if(err) throw err;
+			console.log("Redirecting to "+reply)
+			res.redirect(reply+req.url);
+		})
+	});
 
-### Proxy server
-
-Bonus: How might you use redis and express to introduce a proxy server?
-
-See [rpoplpush](http://redis.io/commands/rpoplpush)
