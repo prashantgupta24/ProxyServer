@@ -2,13 +2,18 @@ var multer  = require('multer')
 var express = require('express')
 var fs      = require('fs')
 var app = express()
-var proxy = express()
+var proxyS = express()
+var httpProxy = require('http-proxy')
 // REDIS
 
 ///////////// WEB ROUTES
 
 var redis = require("redis");
 var client = redis.createClient();
+
+//proxy
+var options = {};
+var proxy   = httpProxy.createProxyServer(options);
 // Add hook to make it easier to get all visited URLS.
 app.use(function(req, res, next)
 {
@@ -30,12 +35,20 @@ app.get('/recent', function(req, res) {
 	 });
 });
 
-proxy.use(function(req, res, next){
+//commented out as redirect cannot handle POST requests
+// proxy.use(function(req, res, next){
+//
+// 	client.rpoplpush("servers", "servers", function(err, reply){
+// 		if(err) throw err;
+// 		console.log("Redirecting to "+reply)
+// 		res.redirect(reply+req.url);
+// 	})
+// });
 
+proxyS.use(function(req, res, next){
 	client.rpoplpush("servers", "servers", function(err, reply){
-		if(err) throw err;
 		console.log("Redirecting to "+reply)
-		res.redirect(reply+req.url);
+		proxy.web( req, res, {target: reply } );
 	})
 });
 
@@ -130,7 +143,7 @@ app.get('/set', function(req, res) {
 	 client.lpush("servers", "http://"+host+":"+port)
  })
 
- var proxyServer = proxy.listen(3002, function (){
+ var proxyServer = proxyS.listen(3002, function (){
 
 	 var host = proxyServer.address().address
 	 var port = proxyServer.address().port
